@@ -17,14 +17,14 @@ enum ZendeskMessagingMessageType {
 /// Used by ZendeskMessaging to attach custom async observers
 class ZendeskMessagingObserver {
   final bool removeOnCall;
-  final Function(Map? args) func;
+  final Function(Map args) func;
 
   ZendeskMessagingObserver(this.removeOnCall, this.func);
 }
 
 class ZendeskLoginResponse {
-  final String? id;
-  final String? externalId;
+  final String id;
+  final String externalId;
 
   ZendeskLoginResponse(this.id, this.externalId);
 }
@@ -41,13 +41,13 @@ class ZendeskMessaging {
   };
 
   /// Global handler, all channel method calls will trigger this observer
-  static Function(ZendeskMessagingMessageType type, Map? arguments)? _handler;
+  static Function(ZendeskMessagingMessageType type, Map arguments) _handler;
 
   /// Allow end-user to use local observer when calling some methods
   static final Map<ZendeskMessagingMessageType, ZendeskMessagingObserver> _observers = {};
 
   /// Attach a global observer for incoming messages
-  static void setMessageHandler(Function(ZendeskMessagingMessageType type, Map? arguments)? handler) {
+  static void setMessageHandler(Function(ZendeskMessagingMessageType type, Map arguments) handler) {
     _handler = handler;
   }
 
@@ -55,7 +55,7 @@ class ZendeskMessaging {
   ///
   /// @param  androidChannelKey  The Android SDK key generated from Zendesk dashboard
   /// @param  iosChannelKey      The iOS SDK key generated from the Zendesk dashboard
-  static Future<void> initialize({required String androidChannelKey, required String iosChannelKey}) async {
+  static Future<void> initialize({String androidChannelKey, String iosChannelKey}) async {
     if (androidChannelKey.isEmpty || iosChannelKey.isEmpty) {
       debugPrint('ZendeskMessaging - initialize - keys can not be empty');
       return;
@@ -85,15 +85,18 @@ class ZendeskMessaging {
   /// @param  jwt       Required by the SDK - You must generate it from your backend
   /// @param  onSuccess Optional - If you need to be notified about the login success
   /// @param  onFailure Optional - If you need to be notified about the login failure
-  static Future<void> loginUserCallbacks({required String jwt, Function(String? id, String? externalId)? onSuccess, Function()? onFailure}) async {
+  static Future<void> loginUserCallbacks(
+      {String jwt, Function(String id, String externalId) onSuccess, Function() onFailure}) async {
     if (jwt.isEmpty) {
       debugPrint('ZendeskMessaging - loginUser - jwt can not be empty');
       return;
     }
 
     try {
-      _setObserver(ZendeskMessagingMessageType.loginSuccess, onSuccess != null ? (Map? args) => onSuccess(args?["id"], args?["externalId"]) : null);
-      _setObserver(ZendeskMessagingMessageType.loginFailure, onFailure != null ? (Map? args) => onFailure() : null);
+      _setObserver(ZendeskMessagingMessageType.loginSuccess,
+          onSuccess != null ? (Map args) => onSuccess(args["id"], args["externalId"]) : null);
+      _setObserver(ZendeskMessagingMessageType.loginFailure,
+          onFailure != null ? (Map args) => onFailure() : null);
 
       await _channel.invokeMethod('loginUser', {'jwt': jwt});
     } catch (e) {
@@ -104,7 +107,7 @@ class ZendeskMessaging {
   /// Helper function to login waiting for future to complete
   ///
   /// @return   The zendesk userId
-  static Future<ZendeskLoginResponse> loginUser({required String jwt}) async {
+  static Future<ZendeskLoginResponse> loginUser({String jwt}) async {
     var completer = Completer<ZendeskLoginResponse>();
     await loginUserCallbacks(
       jwt: jwt,
@@ -118,10 +121,12 @@ class ZendeskMessaging {
   ///
   /// @param  onSuccess Optional - If you need to be notified about the logout success
   /// @param  onFailure Optional - If you need to be notified about the logout failure
-  static Future<void> logoutUserCallbacks({Function()? onSuccess, Function()? onFailure}) async {
+  static Future<void> logoutUserCallbacks({Function() onSuccess, Function() onFailure}) async {
     try {
-      _setObserver(ZendeskMessagingMessageType.logoutSuccess, onSuccess != null ? (Map? args) => onSuccess() : null);
-      _setObserver(ZendeskMessagingMessageType.logoutFailure, onFailure != null ? (Map? args) => onFailure() : null);
+      _setObserver(ZendeskMessagingMessageType.logoutSuccess,
+          onSuccess != null ? (Map args) => onSuccess() : null);
+      _setObserver(ZendeskMessagingMessageType.logoutFailure,
+          onFailure != null ? (Map args) => onFailure() : null);
 
       await _channel.invokeMethod('logoutUser');
     } catch (e) {
@@ -145,14 +150,14 @@ class ZendeskMessaging {
       return;
     }
 
-    final ZendeskMessagingMessageType type = channelMethodToMessageType[call.method]!;
+    final ZendeskMessagingMessageType type = channelMethodToMessageType[call.method];
     var globalHandler = _handler;
     if (globalHandler != null) {
       globalHandler(type, call.arguments);
     }
 
     // call all observers too
-    final ZendeskMessagingObserver? observer = _observers[type];
+    final ZendeskMessagingObserver observer = _observers[type];
     if (observer != null) {
       observer.func(call.arguments);
       if (observer.removeOnCall) {
@@ -162,7 +167,8 @@ class ZendeskMessaging {
   }
 
   /// Add an observer for a specific type
-  static _setObserver(ZendeskMessagingMessageType type, Function(Map? args)? func, {bool removeOnCall = true}) {
+  static _setObserver(ZendeskMessagingMessageType type, Function(Map args) func,
+      {bool removeOnCall = true}) {
     if (func == null) {
       _observers.remove(type);
     } else {
